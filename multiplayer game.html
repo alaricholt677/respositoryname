@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Terrain Game</title>
+    <style>
+        body { text-align: center; font-family: Arial, sans-serif; }
+        canvas { border: 1px solid black; display: block; margin: 0 auto; }
+        .controls { display: flex; justify-content: space-around; flex-wrap: wrap; margin-top: 10px; }
+        .control-panel { display: flex; flex-direction: column; align-items: center; }
+        button { margin: 5px; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>2D Terrain Game</h1>
+    <canvas id="gameCanvas" width="1600" height="800"></canvas>
+    <div>
+        <button onclick="addPlayer()">Add Player</button>
+        <button onclick="removePlayer()">Remove Player</button>
+        <button onclick="saveGame()">Save Game</button>
+        <input type="file" id="importFile" accept=".json" onchange="importGame(event)">
+    </div>
+    <div class="controls" id="controlPanels"></div>
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const TILE_SIZE = 50;
+        const playerColors = ['red', 'blue', 'purple', 'lime'];
+        const players = {};
+        const blocks = [];
+        let playerCount = 0;
+        const maxPlayers = 4;
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw blocks
+            for (const block of blocks) {
+                ctx.fillStyle = block.color;
+                ctx.fillRect(block.x, block.y, TILE_SIZE, TILE_SIZE);
+            }
+
+            // Draw players
+            for (const playerId in players) {
+                const player = players[playerId];
+                ctx.fillStyle = player.color;
+                ctx.fillRect(player.x, player.y, TILE_SIZE, TILE_SIZE);
+            }
+        }
+
+        function movePlayer(playerId, direction) {
+            const player = players[playerId];
+            const speed = TILE_SIZE;
+            let newX = player.x;
+            let newY = player.y;
+
+            switch (direction) {
+                case 'left':
+                    newX = player.x - speed;
+                    break;
+                case 'right':
+                    newX = player.x + speed;
+                    break;
+                case 'up':
+                    newY = player.y - speed;
+                    break;
+                case 'down':
+                    newY = player.y + speed;
+                    break;
+            }
+
+            if (newX >= 0 && newX <= canvas.width - TILE_SIZE) {
+                player.x = newX;
+            }
+            if (newY >= 0 && newY <= canvas.height - TILE_SIZE) {
+                player.y = newY;
+            }
+
+            draw();
+        }
+
+        function addPlayer() {
+            if (playerCount < maxPlayers) {
+                playerCount++;
+                const playerId = 'player' + playerCount;
+                players[playerId] = {
+                    x: canvas.width / 2 - TILE_SIZE / 2,
+                    y: canvas.height - TILE_SIZE * 2,
+                    color: playerColors[playerCount - 1]
+                };
+
+                const controlPanel = document.createElement('div');
+                controlPanel.classList.add('control-panel');
+                controlPanel.innerHTML = `
+                    <h3>Player ${playerCount}</h3>
+                    <button onclick="movePlayer('${playerId}', 'up')">Up</button>
+                    <button onclick="movePlayer('${playerId}', 'down')">Down</button>
+                    <button onclick="movePlayer('${playerId}', 'left')">Left</button>
+                    <button onclick="movePlayer('${playerId}', 'right')">Right</button>
+                `;
+                document.getElementById('controlPanels').appendChild(controlPanel);
+
+                draw();
+            }
+        }
+
+        function removePlayer() {
+            if (playerCount > 0) {
+                const playerId = 'player' + playerCount;
+                delete players[playerId];
+                const controlPanel = document.querySelector(`#controlPanels div:has(button[onclick="movePlayer('${playerId}', 'up')"])`);
+                controlPanel?.remove();
+                playerCount--;
+
+                draw();
+            }
+        }
+
+        function saveGame() {
+            const gameState = {
+                players,
+                blocks
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(gameState));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "game_state.json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function importGame(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const gameState = JSON.parse(e.target.result);
+                    players = gameState.players;
+                    blocks.length = 0;
+                    gameState.blocks.forEach(block => blocks.push(block));
+
+                    document.getElementById('controlPanels').innerHTML = '';
+                    for (const playerId in players) {
+                        const controlPanel = document.createElement('div');
+                        controlPanel.classList.add('control-panel');
+                        controlPanel.innerHTML = `
+                            <h3>${playerId.replace('player', 'Player ')}</h3>
+                            <button onclick="movePlayer('${playerId}', 'up')">Up</button>
+                            <button onclick="movePlayer('${playerId}', 'down')">Down</button>
+                            <button onclick="movePlayer('${playerId}', 'left')">Left</button>
+                            <button onclick="movePlayer('${playerId}', 'right')">Right</button>
+                        `;
+                        document.getElementById('controlPanels').appendChild(controlPanel);
+                    }
+
+                    draw();
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        function gameLoop() {
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Initial draw with one player
+        addPlayer();
+
+        // Start the game loop
+        gameLoop();
+    </script>
+</body>
+</html>
